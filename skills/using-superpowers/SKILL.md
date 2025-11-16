@@ -48,6 +48,22 @@ If you catch yourself thinking ANY of these thoughts, STOP. You are rationalizin
 
 If a skill for your task exists, you must use it or you will fail at your task.
 
+## When the Skill Tool Fails
+
+**If Skill tool errors:**
+
+1. **DO NOT bypass** - Error ≠ permission to skip
+2. **Read directly** - Use Read: `.claude/skills/{skill-name}/SKILL.md`
+3. **Follow manually** - Execute every step
+4. **Report and fix** - Tell user about error, investigate root cause
+
+**Common errors:** Parsing (backticks in code), path issues, permissions
+
+❌ "Tool failed, I'll skip the skill"
+✅ "Tool failed with error X. Reading `.claude/skills/...` directly and following manually while investigating..."
+
+**Remember:** Skill loading failure is a TECHNICAL problem, not permission to bypass the PROCESS.
+
 ## Skills with Checklists
 
 If a skill has a checklist, YOU MUST create TodoWrite todos for EACH item.
