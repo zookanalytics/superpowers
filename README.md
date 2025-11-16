@@ -11,7 +11,7 @@ A comprehensive skills library of proven techniques, patterns, and workflows for
 - **Meta Skills** - Creating, testing, and sharing skills
 
 Plus:
-- **Slash Commands** - `/superpowers:brainstorm`, `/superpowers:write-plan`, `/superpowers:execute-plan`
+- **Slash Commands** - `/superpowers:brainstorm`, `/superpowers:write-plan`, `/superpowers:execute-plan`, `/superpowers:review-branch`
 - **Automatic Integration** - Skills activate automatically when relevant
 - **Consistent Workflows** - Systematic approaches to common engineering tasks
 
@@ -39,6 +39,7 @@ Read the introduction: [Superpowers for Claude Code](https://blog.fsck.com/2025/
 # /superpowers:brainstorm - Interactive design refinement
 # /superpowers:write-plan - Create implementation plan
 # /superpowers:execute-plan - Execute plan in batches
+# /superpowers:review-branch - Comprehensive branch review
 ```
 
 ### Codex (Experimental)
@@ -64,6 +65,11 @@ Tell Codex to fetch https://raw.githubusercontent.com/obra/superpowers/refs/head
 **Execute the plan:**
 ```
 /superpowers:execute-plan
+```
+
+**Review all changes before finishing:**
+```
+/superpowers:review-branch
 ```
 
 ### Automatic Skill Activation
@@ -107,11 +113,12 @@ Skills activate automatically when relevant. For example:
 
 ### Commands
 
-All commands are thin wrappers that activate the corresponding skill:
+Commands orchestrate workflows using one or more skills:
 
 - **brainstorm.md** - Activates the `brainstorming` skill
 - **write-plan.md** - Activates the `writing-plans` skill
 - **execute-plan.md** - Activates the `executing-plans` skill
+- **review-branch.md** - Comprehensive review of all branch changes using `requesting-code-review` and `receiving-code-review`
 
 ## How It Works
 

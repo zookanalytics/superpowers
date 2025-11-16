@@ -15,6 +15,10 @@ Guide completion of development work by presenting clear options and handling ch
 
 ## The Process
 
+**Before starting:** Consider whether the branch has been comprehensively reviewed:
+- If this work hasn't been reviewed yet, suggest: "Would you like to run /review-branch first to get comprehensive feedback on all changes?"
+- If already reviewed or user declines, proceed to Step 1
+
 ### Step 1: Verify Tests
 
 **Before presenting options, verify tests pass:**
@@ -197,4 +201,5 @@ git worktree remove <worktree-path>
 - **executing-plans** (Step 5) - After all batches complete
 
 **Pairs with:**
+- **/review-branch command** - Run before this skill for comprehensive code review
 - **using-git-worktrees** - Cleans up worktree created by that skill
