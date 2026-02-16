@@ -1,5 +1,281 @@
 # Superpowers Release Notes
 
+## v4.3.0 (2026-02-12)
+
+This fix should dramatically improve superpowers skills compliance and should reduce the chances of Claude entering its native plan mode unintentionally.
+
+### Changed
+
+**Brainstorming skill now enforces its workflow instead of describing it**
+
+Models were skipping the design phase and jumping straight to implementation skills like frontend-design, or collapsing the entire brainstorming process into a single text block. The skill now uses hard gates, a mandatory checklist, and a graphviz process flow to enforce compliance:
+
+- `<HARD-GATE>`: no implementation skills, code, or scaffolding until design is presented and user approves
+- Explicit checklist (6 items) that must be created as tasks and completed in order
+- Graphviz process flow with `writing-plans` as the only valid terminal state
+- Anti-pattern callout for "this is too simple to need a design" — the exact rationalization models use to skip the process
+- Design section sizing based on section complexity, not project complexity
+
+**Using-superpowers workflow graph intercepts EnterPlanMode**
+
+Added an `EnterPlanMode` intercept to the skill flow graph. When the model is about to enter Claude's native plan mode, it checks whether brainstorming has happened and routes through the brainstorming skill instead. Plan mode is never entered.
+
+### Fixed
+
+**SessionStart hook now runs synchronously**
+
+Changed `async: true` to `async: false` in hooks.json. When async, the hook could fail to complete before the model's first turn, meaning using-superpowers instructions weren't in context for the first message.
+
+## v4.2.0 (2026-02-05)
+
+### Breaking Changes
+
+**Codex: Replaced bootstrap CLI with native skill discovery**
+
+The `superpowers-codex` bootstrap CLI, Windows `.cmd` wrapper, and related bootstrap content file have been removed. Codex now uses native skill discovery via `~/.agents/skills/superpowers/` symlink, so the old `use_skill`/`find_skills` CLI tools are no longer needed.
+
+Installation is now just clone + symlink (documented in INSTALL.md). No Node.js dependency required. The old `~/.codex/skills/` path is deprecated.
+
+### Fixes
+
+**Windows: Fixed Claude Code 2.1.x hook execution (#331)**
+
+Claude Code 2.1.x changed how hooks execute on Windows: it now auto-detects `.sh` files in commands and prepends `bash`. This broke the polyglot wrapper pattern because `bash "run-hook.cmd" session-start.sh` tries to execute the `.cmd` file as a bash script.
+
+Fix: hooks.json now calls session-start.sh directly. Claude Code 2.1.x handles the bash invocation automatically. Also added .gitattributes to enforce LF line endings for shell scripts (fixes CRLF issues on Windows checkout).
+
+**Windows: SessionStart hook runs async to prevent terminal freeze (#404, #413, #414, #419)**
+
+The synchronous SessionStart hook blocked the TUI from entering raw mode on Windows, freezing all keyboard input. Running the hook async prevents the freeze while still injecting superpowers context.
+
+**Windows: Fixed O(n^2) `escape_for_json` performance**
+
+The character-by-character loop using `${input:$i:1}` was O(n^2) in bash due to substring copy overhead. On Windows Git Bash this took 60+ seconds. Replaced with bash parameter substitution (`${s//old/new}`) which runs each pattern as a single C-level pass — 7x faster on macOS, dramatically faster on Windows.
+
+**Codex: Fixed Windows/PowerShell invocation (#285, #243)**
+
+- Windows doesn't respect shebangs, so directly invoking the extensionless `superpowers-codex` script triggered an "Open with" dialog. All invocations now prefixed with `node`.
+- Fixed `~/` path expansion on Windows — PowerShell doesn't expand `~` when passed as an argument to `node`. Changed to `$HOME` which expands correctly in both bash and PowerShell.
+
+**Codex: Fixed path resolution in installer**
+
+Used `fileURLToPath()` instead of manual URL pathname parsing to correctly handle paths with spaces and special characters on all platforms.
+
+**Codex: Fixed stale skills path in writing-skills**
+
+Updated `~/.codex/skills/` reference (deprecated) to `~/.agents/skills/` for native discovery.
+
+### Improvements
+
+**Worktree isolation now required before implementation**
+
+Added `using-git-worktrees` as a required skill for both `subagent-driven-development` and `executing-plans`. Implementation workflows now explicitly require setting up an isolated worktree before starting work, preventing accidental work directly on main.
+
+**Main branch protection softened to require explicit consent**
+
+Instead of prohibiting main branch work entirely, the skills now allow it with explicit user consent. More flexible while still ensuring users are aware of the implications.
+
+**Simplified installation verification**
+
+Removed `/help` command check and specific slash command list from verification steps. Skills are primarily invoked by describing what you want to do, not by running specific commands.
+
+**Codex: Clarified subagent tool mapping in bootstrap**
+
+Improved documentation of how Codex tools map to Claude Code equivalents for subagent workflows.
+
+### Tests
+
+- Added worktree requirement test for subagent-driven-development
+- Added main branch red flag warning test
+- Fixed case sensitivity in skill recognition test assertions
+
+---
+
+## v4.1.1 (2026-01-23)
+
+### Fixes
+
+**OpenCode: Standardized on `plugins/` directory per official docs (#343)**
+
+OpenCode's official documentation uses `~/.config/opencode/plugins/` (plural). Our docs previously used `plugin/` (singular). While OpenCode accepts both forms, we've standardized on the official convention to avoid confusion.
+
+Changes:
+- Renamed `.opencode/plugin/` to `.opencode/plugins/` in repo structure
+- Updated all installation docs (INSTALL.md, README.opencode.md) across all platforms
+- Updated test scripts to match
+
+**OpenCode: Fixed symlink instructions (#339, #342)**
+
+- Added explicit `rm` before `ln -s` (fixes "file already exists" errors on reinstall)
+- Added missing skills symlink step that was absent from INSTALL.md
+- Updated from deprecated `use_skill`/`find_skills` to native `skill` tool references
+
+---
+
+## v4.1.0 (2026-01-23)
+
+### Breaking Changes
+
+**OpenCode: Switched to native skills system**
+
+Superpowers for OpenCode now uses OpenCode's native `skill` tool instead of custom `use_skill`/`find_skills` tools. This is a cleaner integration that works with OpenCode's built-in skill discovery.
+
+**Migration required:** Skills must be symlinked to `~/.config/opencode/skills/superpowers/` (see updated installation docs).
+
+### Fixes
+
+**OpenCode: Fixed agent reset on session start (#226)**
+
+The previous bootstrap injection method using `session.prompt({ noReply: true })` caused OpenCode to reset the selected agent to "build" on first message. Now uses `experimental.chat.system.transform` hook which modifies the system prompt directly without side effects.
+
+**OpenCode: Fixed Windows installation (#232)**
+
+- Removed dependency on `skills-core.js` (eliminates broken relative imports when file is copied instead of symlinked)
+- Added comprehensive Windows installation docs for cmd.exe, PowerShell, and Git Bash
+- Documented proper symlink vs junction usage for each platform
+
+**Claude Code: Fixed Windows hook execution for Claude Code 2.1.x**
+
+Claude Code 2.1.x changed how hooks execute on Windows: it now auto-detects `.sh` files in commands and prepends `bash `. This broke the polyglot wrapper pattern because `bash "run-hook.cmd" session-start.sh` tries to execute the .cmd file as a bash script.
+
+Fix: hooks.json now calls session-start.sh directly. Claude Code 2.1.x handles the bash invocation automatically. Also added .gitattributes to enforce LF line endings for shell scripts (fixes CRLF issues on Windows checkout).
+
+---
+
+## v4.0.3 (2025-12-26)
+
+### Improvements
+
+**Strengthened using-superpowers skill for explicit skill requests**
+
+Addressed a failure mode where Claude would skip invoking a skill even when the user explicitly requested it by name (e.g., "subagent-driven-development, please"). Claude would think "I know what that means" and start working directly instead of loading the skill.
+
+Changes:
+- Updated "The Rule" to say "Invoke relevant or requested skills" instead of "Check for skills" - emphasizing active invocation over passive checking
+- Added "BEFORE any response or action" - the original wording only mentioned "response" but Claude would sometimes take action without responding first
+- Added reassurance that invoking a wrong skill is okay - reduces hesitation
+- Added new red flag: "I know what that means" → Knowing the concept ≠ using the skill
+
+**Added explicit skill request tests**
+
+New test suite in `tests/explicit-skill-requests/` that verifies Claude correctly invokes skills when users request them by name. Includes single-turn and multi-turn test scenarios.
+
+## v4.0.2 (2025-12-23)
+
+### Fixes
+
+**Slash commands now user-only**
+
+Added `disable-model-invocation: true` to all three slash commands (`/brainstorm`, `/execute-plan`, `/write-plan`). Claude can no longer invoke these commands via the Skill tool—they're restricted to manual user invocation only.
+
+The underlying skills (`superpowers:brainstorming`, `superpowers:executing-plans`, `superpowers:writing-plans`) remain available for Claude to invoke autonomously. This change prevents confusion when Claude would invoke a command that just redirects to a skill anyway.
+
+## v4.0.1 (2025-12-23)
+
+### Fixes
+
+**Clarified how to access skills in Claude Code**
+
+Fixed a confusing pattern where Claude would invoke a skill via the Skill tool, then try to Read the skill file separately. The `using-superpowers` skill now explicitly states that the Skill tool loads skill content directly—no need to read files.
+
+- Added "How to Access Skills" section to `using-superpowers`
+- Changed "read the skill" → "invoke the skill" in instructions
+- Updated slash commands to use fully qualified skill names (e.g., `superpowers:brainstorming`)
+
+**Added GitHub thread reply guidance to receiving-code-review** (h/t @ralphbean)
+
+Added a note about replying to inline review comments in the original thread rather than as top-level PR comments.
+
+**Added automation-over-documentation guidance to writing-skills** (h/t @EthanJStark)
+
+Added guidance that mechanical constraints should be automated, not documented—save skills for judgment calls.
+
+## v4.0.0 (2025-12-17)
+
+### New Features
+
+**Two-stage code review in subagent-driven-development**
+
+Subagent workflows now use two separate review stages after each task:
+
+1. **Spec compliance review** - Skeptical reviewer verifies implementation matches spec exactly. Catches missing requirements AND over-building. Won't trust implementer's report—reads actual code.
+
+2. **Code quality review** - Only runs after spec compliance passes. Reviews for clean code, test coverage, maintainability.
+
+This catches the common failure mode where code is well-written but doesn't match what was requested. Reviews are loops, not one-shot: if reviewer finds issues, implementer fixes them, then reviewer checks again.
+
+Other subagent workflow improvements:
+- Controller provides full task text to workers (not file references)
+- Workers can ask clarifying questions before AND during work
+- Self-review checklist before reporting completion
+- Plan read once at start, extracted to TodoWrite
+
+New prompt templates in `skills/subagent-driven-development/`:
+- `implementer-prompt.md` - Includes self-review checklist, encourages questions
+- `spec-reviewer-prompt.md` - Skeptical verification against requirements
+- `code-quality-reviewer-prompt.md` - Standard code review
+
+**Debugging techniques consolidated with tools**
+
+`systematic-debugging` now bundles supporting techniques and tools:
+- `root-cause-tracing.md` - Trace bugs backward through call stack
+- `defense-in-depth.md` - Add validation at multiple layers
+- `condition-based-waiting.md` - Replace arbitrary timeouts with condition polling
+- `find-polluter.sh` - Bisection script to find which test creates pollution
+- `condition-based-waiting-example.ts` - Complete implementation from real debugging session
+
+**Testing anti-patterns reference**
+
+`test-driven-development` now includes `testing-anti-patterns.md` covering:
+- Testing mock behavior instead of real behavior
+- Adding test-only methods to production classes
+- Mocking without understanding dependencies
+- Incomplete mocks that hide structural assumptions
+
+**Skill test infrastructure**
+
+Three new test frameworks for validating skill behavior:
+
+`tests/skill-triggering/` - Validates skills trigger from naive prompts without explicit naming. Tests 6 skills to ensure descriptions alone are sufficient.
+
+`tests/claude-code/` - Integration tests using `claude -p` for headless testing. Verifies skill usage via session transcript (JSONL) analysis. Includes `analyze-token-usage.py` for cost tracking.
+
+`tests/subagent-driven-dev/` - End-to-end workflow validation with two complete test projects:
+- `go-fractals/` - CLI tool with Sierpinski/Mandelbrot (10 tasks)
+- `svelte-todo/` - CRUD app with localStorage and Playwright (12 tasks)
+
+### Major Changes
+
+**DOT flowcharts as executable specifications**
+
+Rewrote key skills using DOT/GraphViz flowcharts as the authoritative process definition. Prose becomes supporting content.
+
+**The Description Trap** (documented in `writing-skills`): Discovered that skill descriptions override flowchart content when descriptions contain workflow summaries. Claude follows the short description instead of reading the detailed flowchart. Fix: descriptions must be trigger-only ("Use when X") with no process details.
+
+**Skill priority in using-superpowers**
+
+When multiple skills apply, process skills (brainstorming, debugging) now explicitly come before implementation skills. "Build X" triggers brainstorming first, then domain skills.
+
+**brainstorming trigger strengthened**
+
+Description changed to imperative: "You MUST use this before any creative work—creating features, building components, adding functionality, or modifying behavior."
+
+### Breaking Changes
+
+**Skill consolidation** - Six standalone skills merged:
+- `root-cause-tracing`, `defense-in-depth`, `condition-based-waiting` → bundled in `systematic-debugging/`
+- `testing-skills-with-subagents` → bundled in `writing-skills/`
+- `testing-anti-patterns` → bundled in `test-driven-development/`
+- `sharing-skills` removed (obsolete)
+
+### Other Improvements
+
+- **render-graphs.js** - Tool to extract DOT diagrams from skills and render to SVG
+- **Rationalizations table** in using-superpowers - Scannable format including new entries: "I need more context first", "Let me explore first", "This feels productive"
+- **docs/testing.md** - Guide to testing skills with Claude Code integration tests
+
+---
+
 ## v3.6.2 (2025-12-03)
 
 ### Fixed
@@ -98,9 +374,9 @@
 - Updated terminology: "Superpowers skills" instead of "Core skills"
 
 ### Files Added
-- `codex/INSTALL.md` - Installation guide for Codex users
-- `codex/superpowers-bootstrap.md` - Bootstrap instructions with Codex adaptations
-- `scripts/superpowers-codex` - Unified Node.js executable with all functionality
+- `.codex/INSTALL.md` - Installation guide for Codex users
+- `.codex/superpowers-bootstrap.md` - Bootstrap instructions with Codex adaptations
+- `.codex/superpowers-codex` - Unified Node.js executable with all functionality
 
 **Note:** Codex support is experimental. The integration provides core superpowers functionality but may require refinement based on user feedback.
 
